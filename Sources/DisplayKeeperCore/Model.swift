@@ -51,11 +51,23 @@ public struct Placement: Codable, Equatable, Sendable {
 /// The saved arrangement for one particular set of monitors.
 public struct Profile: Codable, Equatable, Sendable {
     public var placements: [Placement]
+    public var windows: [SavedWindow]
     public var savedAt: Date
 
-    public init(placements: [Placement], savedAt: Date = Date()) {
+    public init(placements: [Placement], windows: [SavedWindow] = [], savedAt: Date = Date()) {
         self.placements = placements
+        self.windows = windows
         self.savedAt = savedAt
+    }
+
+    enum CodingKeys: String, CodingKey { case placements, windows, savedAt }
+
+    // Profiles saved before window support have no "windows" key.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        placements = try c.decode([Placement].self, forKey: .placements)
+        windows = try c.decodeIfPresent([SavedWindow].self, forKey: .windows) ?? []
+        savedAt = try c.decode(Date.self, forKey: .savedAt)
     }
 
     public var id: String { Profile.id(for: placements.map(\.key)) }

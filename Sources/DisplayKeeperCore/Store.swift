@@ -6,7 +6,8 @@ public final class ProfileStore: @unchecked Sendable {
     private let lock = NSLock()
 
     public static var defaultURL: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        if let path = ProcessInfo.processInfo.environment["DISPLAY_KEEPER_PROFILES"] { return URL(fileURLWithPath: path) }
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("DisplayKeeper/profiles.json")
     }
 

@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.delegate = self
         statusItem.menu = menu
         keeper.isPaused = UserDefaults.standard.bool(forKey: "paused")
+        keeper.restoresWindows = UserDefaults.standard.object(forKey: "restoresWindows") as? Bool ?? true
         keeper.onRestore = { [weak self] outcome in self?.record(outcome) }
         keeper.start()
     }
@@ -23,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let time = Date().formatted(date: .omitted, time: .shortened)
         switch outcome {
         case .restored(let n): lastOutcome = "Restored \(n) display\(n == 1 ? "" : "s") at \(time)"
+        case .windowsRestored(let n): lastOutcome = "Moved \(n) window\(n == 1 ? "" : "s") back at \(time)"
         case .failed(let why): lastOutcome = "Failed at \(time): \(why)"
         default: break
         }
@@ -47,6 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         menu.addItem(.separator())
 
+        if let profile { menu.addItem(disabled("Saved: \(profile.windows.count) windows, \(profile.savedAt.formatted(date: .abbreviated, time: .shortened))")) }
         menu.addItem(item(profile == nil ? "Save Current Layout" : "Save Current Layout (Replace)", #selector(save), "s"))
         let restore = item("Restore Saved Layout", #selector(restore), "r")
         restore.isEnabled = profile != nil
@@ -54,6 +57,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if profile != nil { menu.addItem(item("Forget Layout for These Displays", #selector(forget))) }
         menu.addItem(.separator())
 
+        let windows = item(SystemWindows.isTrusted || !keeper.restoresWindows ? "Restore Windows" : "Restore Windows (needs Accessibility access…)", #selector(toggleWindows))
+        windows.state = keeper.restoresWindows && SystemWindows.isTrusted ? .on : .off
+        menu.addItem(windows)
         let pause = item("Pause Automatic Restore", #selector(togglePause))
         pause.state = keeper.isPaused ? .on : .off
         menu.addItem(pause)
@@ -77,7 +83,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc func save() {
-        do { try keeper.saveCurrent(); lastOutcome = "Layout saved" } catch { alert("Could not save layout", error) }
+        do {
+            let p = try keeper.saveCurrent()
+            lastOutcome = "Saved \(p.placements.count) displays, \(p.windows.count) windows"
+        } catch { alert("Could not save layout", error) }
     }
 
     @objc func restore() {
@@ -87,6 +96,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc func forget() {
         let id = Profile.id(for: SystemDisplays.online().map(\.placement.key))
         try? keeper.store.remove(id: id)
+    }
+
+    @objc func toggleWindows() {
+        if keeper.restoresWindows && !SystemWindows.isTrusted {
+            SystemWindows.requestTrust()
+            return
+        }
+        keeper.restoresWindows.toggle()
+        UserDefaults.standard.set(keeper.restoresWindows, forKey: "restoresWindows")
+        if keeper.restoresWindows && !SystemWindows.isTrusted { SystemWindows.requestTrust() }
     }
 
     @objc func togglePause() {

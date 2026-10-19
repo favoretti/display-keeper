@@ -6,6 +6,7 @@ public enum RestoreOutcome: Equatable, Sendable {
     case alreadyCorrect
     case noProfile
     case restored(count: Int)
+    case windowsRestored(count: Int)
     case paused
     case failed(String)
 }
@@ -15,6 +16,7 @@ public enum RestoreOutcome: Equatable, Sendable {
 public final class Keeper {
     public let store: ProfileStore
     public var isPaused = false
+    public var restoresWindows = true
     public var onRestore: ((RestoreOutcome) -> Void)?
     public var log: (String) -> Void = { print("\(Date()) \($0)") }
 
@@ -77,22 +79,31 @@ public final class Keeper {
         if isPaused && !force { return .paused }
         let online = SystemDisplays.online()
         guard let profile = store.profile(for: online.map(\.placement.key)) else { return .noProfile }
-        guard let diff = profile.differences(from: online.map(\.placement)), !diff.isEmpty else {
-            return .alreadyCorrect
+        let diff = profile.differences(from: online.map(\.placement)) ?? []
+        var displaysMoved = 0
+        if !diff.isEmpty {
+            do {
+                ignoreUntil = Date().addingTimeInterval(2)
+                try Arranger.apply(profile, to: online)
+                displaysMoved = diff.count
+            } catch {
+                return .failed(String(describing: error))
+            }
         }
-        do {
-            ignoreUntil = Date().addingTimeInterval(2)
-            try Arranger.apply(profile, to: online)
-            return .restored(count: diff.count)
-        } catch {
-            return .failed(String(describing: error))
-        }
+        // Windows are checked on every pass: macOS can shuffle them even when the displays came back right.
+        let windowsMoved = restoresWindows && !profile.windows.isEmpty
+            ? SystemWindows.restore(profile.windows, displays: SystemDisplays.online().map(\.placement)) : 0
+        if displaysMoved > 0 { return .restored(count: displaysMoved) }
+        if windowsMoved > 0 { return .windowsRestored(count: windowsMoved) }
+        return .alreadyCorrect
     }
 
     /// Save the current arrangement as the layout to keep for this set of monitors.
     @discardableResult
     public func saveCurrent() throws -> Profile {
-        let profile = Profile(placements: SystemDisplays.online().map(\.placement))
+        let displays = SystemDisplays.online().map(\.placement)
+        let windows = restoresWindows ? SystemWindows.snapshot(displays: displays) : []
+        let profile = Profile(placements: displays, windows: windows)
         try store.save(profile)
         return profile
     }

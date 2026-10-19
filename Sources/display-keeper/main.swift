@@ -6,8 +6,9 @@ let usage = """
 usage: display-keeper <command>
 
   list       show online displays and the stable key each is saved under
-  save       save the current arrangement for this set of monitors
+  save       save the current arrangement (displays and windows) for this set of monitors
   restore    re-apply the saved arrangement now
+  windows    list open windows as they would be saved
   status     compare the current arrangement with the saved one
   profiles   list saved profiles
   forget     delete the profile for the current set of monitors
@@ -34,8 +35,9 @@ func run() {
     case "save":
         do {
             let profile = try keeper.saveCurrent()
-            print("saved layout for \(profile.placements.count) displays:")
+            print("saved layout for \(profile.placements.count) displays and \(profile.windows.count) windows:")
             profile.placements.forEach { print("  " + row($0)) }
+            if !SystemWindows.isTrusted { print("windows not saved: grant Accessibility access to this terminal or app") }
         } catch { fail("could not save: \(error)") }
     case "restore":
         switch keeper.restore(force: true) {
@@ -43,6 +45,7 @@ func run() {
         case .failed(let why): fail(why)
         case .alreadyCorrect: print("already correct")
         case .restored(let n): print("restored \(n) display(s)")
+        case .windowsRestored(let n): print("moved \(n) window(s)")
         case .paused: break
         }
     case "status":
@@ -53,9 +56,18 @@ func run() {
             print("differs from saved layout:")
             diff.forEach { print("  want " + row($0)) }
         }
+    case "windows":
+        guard SystemWindows.isTrusted else { fail("needs Accessibility access") }
+        for w in SystemWindows.snapshot(displays: SystemDisplays.online().map(\.placement)) {
+            print("\(w.appName.padding(toLength: 18, withPad: " ", startingAt: 0)) \(w.width)x\(w.height) +\(w.x)+\(w.y) on \(w.displayKey)  \(w.title.prefix(50))")
+        }
+    case "_move":
+        let a = CommandLine.arguments
+        guard a.count == 7, let n = Array(a[3...6]).map({ Double($0) }) as? [Double] else { fail("_move <bundle-id> x y w h") }
+        if !SystemWindows.debugMove(bundleID: a[2], to: CGRect(x: n[0], y: n[1], width: n[2], height: n[3])) { fail("no window") }
     case "profiles":
         for (id, p) in store.all().sorted(by: { $0.key < $1.key }) {
-            print("\(id)  (saved \(p.savedAt.formatted()))")
+            print("\(id)  (saved \(p.savedAt.formatted()), \(p.windows.count) windows)")
             p.placements.forEach { print("  " + row($0)) }
         }
     case "forget":

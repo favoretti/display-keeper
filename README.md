@@ -1,6 +1,7 @@
 # Display Keeper
 
-A tiny macOS menu-bar app that puts your external monitors back where they belong after the Mac wakes up.
+A tiny macOS menu-bar app that puts your external monitors, and the windows on them, back where they belong
+after the Mac wakes up.
 
 ## The problem
 
@@ -20,6 +21,9 @@ command breaks in exactly the case you need it.
 - After wake, unlock and any display change, it compares the current arrangement with the saved one and
   restores positions and resolutions if they differ. If they already match, it does nothing.
 - It rearranges displays with macOS's public CoreGraphics API. No `displayplacer` or other helpers needed.
+- Optionally it also saves **window positions** with the layout, and puts windows back on the right
+  monitor once the displays are in place. Windows are checked on every pass, because macOS can move them
+  even when the displays came back in the right order.
 
 ## Install
 
@@ -39,11 +43,21 @@ scripts/build-app.sh          # -> dist/DisplayKeeper.app
 
 ## Use
 
-1. Arrange your displays the way you want them in System Settings → Displays.
-2. Menu-bar icon → **Save Current Layout**.
+1. Arrange your displays the way you want them in System Settings → Displays, and your windows the way you
+   like them.
+2. Menu-bar icon → **Save Current Layout**. This saves displays and windows together; nothing is saved
+   automatically, so re-save whenever you change your setup.
 3. Turn on **Open at Login**.
+4. For window restore, turn on **Restore Windows** and grant Accessibility access when asked.
 
 That's it. Repeat step 1–2 at each desk you use.
+
+### How windows are matched
+
+Saved windows are matched to open ones in this order: the same window (if the app has kept running), then
+app + window title, then app + the window's position in the app's window list. Windows that match nothing
+are left alone. Minimised and full-screen windows are skipped, and only windows on the current Space of
+each display can be moved.
 
 The menu also has **Restore Saved Layout**, **Forget Layout for These Displays** and
 **Pause Automatic Restore**.
@@ -54,7 +68,8 @@ The app bundle contains a CLI at `DisplayKeeper.app/Contents/Resources/display-k
 
 ```
 display-keeper list       # online displays and the key each is saved under
-display-keeper save       # save the current arrangement for this set of monitors
+display-keeper save       # save displays and windows for this set of monitors
+display-keeper windows    # list open windows as they would be saved
 display-keeper restore    # re-apply it now
 display-keeper status     # compare current vs saved
 display-keeper profiles   # list saved profiles
@@ -73,6 +88,8 @@ Profiles live in `~/Library/Application Support/DisplayKeeper/profiles.json`, sh
 - Tested on Apple silicon. On Intel Macs the IOKit layout differs; the per-unit serial lookup may fall
   back to the port.
 - Mirroring and rotation are not managed; mirrored displays are left as they are.
+- Until releases are signed with a Developer ID, macOS treats every new build as a new app, so the
+  Accessibility permission has to be granted again after each update.
 
 ## License
 
