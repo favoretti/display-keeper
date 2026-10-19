@@ -1,23 +1,41 @@
 import AppKit
 import DisplayKeeperCore
-import ServiceManagement
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     let keeper = Keeper()
+    lazy var settings = AppSettings(keeper: keeper)
+    lazy var layouts = LayoutsModel(keeper: keeper)
+    let updater = UpdaterModel()
     var statusItem: NSStatusItem!
     var lastOutcome = "Watching"
 
+    private lazy var settingsWindow = SettingsWindowController(settings: settings, layouts: layouts, updater: updater)
+    private lazy var aboutWindow = WindowPresenter(title: "About Display Keeper", autosaveName: "AboutWindow", content: AboutView())
+    private lazy var helpWindow = WindowPresenter(title: "Display Keeper Help", autosaveName: "HelpWindow", resizable: true, content: HelpView())
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        LaunchOptions.applyAppearance()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "rectangle.3.group", accessibilityDescription: "Display Keeper")
         let menu = NSMenu()
         menu.delegate = self
         statusItem.menu = menu
-        keeper.isPaused = UserDefaults.standard.bool(forKey: "paused")
-        keeper.restoresWindows = UserDefaults.standard.object(forKey: "restoresWindows") as? Bool ?? true
+        installMainMenu()
+        _ = settings
         keeper.onRestore = { [weak self] outcome in self?.record(outcome) }
         keeper.start()
+        LaunchOptions.show.forEach(show)
+    }
+
+    func show(_ screen: LaunchOptions.Screen) {
+        switch screen {
+        case .settings: settingsWindow.show(.general)
+        case .layouts: settingsWindow.show(.layouts)
+        case .updates: settingsWindow.show(.updates)
+        case .about: aboutWindow.show()
+        case .help: helpWindow.show()
+        }
     }
 
     func record(_ outcome: RestoreOutcome) {
@@ -31,6 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
+        settings.refresh()
         menu.removeAllItems()
         let online = SystemDisplays.online()
         let profile = keeper.store.profile(for: online.map(\.placement.key))
@@ -57,15 +76,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if profile != nil { menu.addItem(item("Forget Layout for These Displays", #selector(forget))) }
         menu.addItem(.separator())
 
-        let windows = item(SystemWindows.isTrusted || !keeper.restoresWindows ? "Restore Windows" : "Restore Windows (needs Accessibility access…)", #selector(toggleWindows))
-        windows.state = keeper.restoresWindows && SystemWindows.isTrusted ? .on : .off
+        let windows = item(settings.isTrusted || !settings.restoresWindows ? "Restore Windows" : "Restore Windows (needs Accessibility access…)", #selector(toggleWindows))
+        windows.state = settings.restoresWindows && settings.isTrusted ? .on : .off
         menu.addItem(windows)
         let pause = item("Pause Automatic Restore", #selector(togglePause))
-        pause.state = keeper.isPaused ? .on : .off
+        pause.state = settings.isPaused ? .on : .off
         menu.addItem(pause)
         let login = item("Open at Login", #selector(toggleLogin))
-        login.state = SMAppService.mainApp.status == .enabled ? .on : .off
+        login.state = settings.opensAtLogin ? .on : .off
         menu.addItem(login)
+        menu.addItem(.separator())
+
+        menu.addItem(item("Settings…", #selector(showSettings), ","))
+        let updates = item("Check for Updates…", #selector(checkForUpdates))
+        updates.isEnabled = updater.isConfigured && updater.canCheck
+        menu.addItem(updates)
+        menu.addItem(item("Display Keeper Help", #selector(showHelp)))
+        menu.addItem(item("About Display Keeper", #selector(showAbout)))
         menu.addItem(.separator())
         menu.addItem(item("Quit Display Keeper", #selector(NSApplication.terminate(_:)), "q"))
     }
@@ -82,9 +109,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return i
     }
 
+    /// Accessory apps still get a main menu while one of their windows is key; it carries the
+    /// standard shortcuts (⌘W, ⌘C, ⌘,) for the Settings, Help and About windows.
+    private func installMainMenu() {
+        let main = NSMenu()
+        let appMenu = NSMenu()
+        appMenu.addItem(item("About Display Keeper", #selector(showAbout)))
+        appMenu.addItem(.separator())
+        appMenu.addItem(item("Settings…", #selector(showSettings), ","))
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "Hide Display Keeper", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(item("Quit Display Keeper", #selector(NSApplication.terminate(_:)), "q"))
+        main.addItem(withTitle: "Display Keeper", action: nil, keyEquivalent: "").submenu = appMenu
+
+        let edit = NSMenu(title: "Edit")
+        edit.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        main.addItem(withTitle: "Edit", action: nil, keyEquivalent: "").submenu = edit
+
+        let window = NSMenu(title: "Window")
+        window.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        window.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        main.addItem(withTitle: "Window", action: nil, keyEquivalent: "").submenu = window
+
+        let help = NSMenu(title: "Help")
+        help.addItem(item("Display Keeper Help", #selector(showHelp)))
+        main.addItem(withTitle: "Help", action: nil, keyEquivalent: "").submenu = help
+        NSApp.mainMenu = main
+    }
+
+    @objc func showSettings() { settingsWindow.show() }
+    @objc func showHelp() { helpWindow.show() }
+    @objc func showAbout() { aboutWindow.show() }
+    @objc func checkForUpdates() { updater.checkForUpdates() }
+
     @objc func save() {
         do {
-            let p = try keeper.saveCurrent()
+            let p = try layouts.saveCurrent()
             lastOutcome = "Saved \(p.placements.count) displays, \(p.windows.count) windows"
         } catch { alert("Could not save layout", error) }
     }
@@ -94,37 +155,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc func forget() {
-        let id = Profile.id(for: SystemDisplays.online().map(\.placement.key))
-        try? keeper.store.remove(id: id)
+        try? layouts.forgetCurrent()
     }
 
     @objc func toggleWindows() {
-        if keeper.restoresWindows && !SystemWindows.isTrusted {
+        if settings.restoresWindows && !settings.isTrusted {
             SystemWindows.requestTrust()
             return
         }
-        keeper.restoresWindows.toggle()
-        UserDefaults.standard.set(keeper.restoresWindows, forKey: "restoresWindows")
-        if keeper.restoresWindows && !SystemWindows.isTrusted { SystemWindows.requestTrust() }
+        settings.restoresWindows.toggle()
     }
 
     @objc func togglePause() {
-        keeper.isPaused.toggle()
-        UserDefaults.standard.set(keeper.isPaused, forKey: "paused")
+        settings.isPaused.toggle()
     }
 
     @objc func toggleLogin() {
-        do {
-            if SMAppService.mainApp.status == .enabled { try SMAppService.mainApp.unregister() }
-            else { try SMAppService.mainApp.register() }
-        } catch { alert("Could not change login item", error) }
+        settings.setOpensAtLogin(!settings.opensAtLogin)
+        if let error = settings.loginError { alert("Could not change login item", error) }
     }
 
     private func alert(_ title: String, _ detail: Any) {
+        NSApp.activateApp()
         let a = NSAlert()
         a.messageText = title
         a.informativeText = String(describing: detail)
         a.runModal()
+    }
+}
+
+/// Hidden launch arguments for development and screenshots:
+/// `--show settings|layouts|updates|about|help` (repeatable) and `--appearance light|dark`.
+enum LaunchOptions {
+    enum Screen: String { case settings, layouts, updates, about, help }
+
+    static var show: [Screen] { values(for: "--show").compactMap(Screen.init(rawValue:)) }
+
+    @MainActor static func applyAppearance() {
+        switch values(for: "--appearance").last {
+        case "dark": NSApp.appearance = NSAppearance(named: .darkAqua)
+        case "light": NSApp.appearance = NSAppearance(named: .aqua)
+        default: break
+        }
+    }
+
+    private static func values(for flag: String) -> [String] {
+        let args = CommandLine.arguments
+        return args.indices.dropLast().filter { args[$0] == flag }.map { args[$0 + 1] }
     }
 }
 

@@ -1,3 +1,5 @@
+<img src="docs/icon.png" width="128" align="right" alt="">
+
 # Display Keeper
 
 A tiny macOS menu-bar app that puts your external monitors, and the windows on them, back where they belong
@@ -27,11 +29,13 @@ command breaks in exactly the case you need it.
 
 ## Install
 
-Download `DisplayKeeper-<version>.zip` from [Releases](../../releases), unzip, and move
-`DisplayKeeper.app` to `/Applications`.
+```sh
+brew install --cask favoretti/tap/display-keeper
+```
 
-Until releases are notarized, macOS will block the first launch: right-click the app → **Open**, or run
-`xattr -dr com.apple.quarantine /Applications/DisplayKeeper.app`.
+Or download `DisplayKeeper-<version>.zip` from [Releases](../../releases), unzip, and move
+`DisplayKeeper.app` to `/Applications`. Releases are signed and notarized, and the app updates itself
+(Settings → Updates).
 
 Or build it yourself (Xcode 16+ / Swift 6 toolchain, macOS 13+):
 
@@ -60,7 +64,8 @@ are left alone. Minimised and full-screen windows are skipped, and only windows 
 each display can be moved.
 
 The menu also has **Restore Saved Layout**, **Forget Layout for These Displays** and
-**Pause Automatic Restore**.
+**Pause Automatic Restore**. **Settings…** has the restore delays, your saved layouts (with the windows
+saved in each) and update preferences; **Help** explains all of this in the app.
 
 ## Command line
 
@@ -88,8 +93,8 @@ Profiles live in `~/Library/Application Support/DisplayKeeper/profiles.json`, sh
 - Tested on Apple silicon. On Intel Macs the IOKit layout differs; the per-unit serial lookup may fall
   back to the port.
 - Mirroring and rotation are not managed; mirrored displays are left as they are.
-- Until releases are signed with a Developer ID, macOS treats every new build as a new app, so the
-  Accessibility permission has to be granted again after each update.
+- Builds you make yourself are ad-hoc signed, so macOS may ask for Accessibility access again after each
+  rebuild. Signed releases keep the permission across updates.
 
 ## License
 

@@ -22,6 +22,7 @@ public final class Keeper {
 
     /// Wake fires a burst of callbacks while monitors come up; act once it has been quiet.
     public var settleDelay: TimeInterval = 4
+    public private(set) var lastOutcome: (RestoreOutcome, Date)?
     /// By unlock the monitors are usually up already.
     public var unlockDelay: TimeInterval = 1
 
@@ -70,6 +71,10 @@ public final class Keeper {
         switch outcome {
         case .alreadyCorrect, .noProfile, .paused: break
         default: log(String(describing: outcome))
+        }
+        switch outcome {
+        case .restored, .windowsRestored, .failed: lastOutcome = (outcome, Date())
+        default: break
         }
         onRestore?(outcome)
         return outcome

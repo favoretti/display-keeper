@@ -10,7 +10,11 @@
 	<key>CFBundleShortVersionString</key><string>__VERSION__</string>
 	<key>CFBundleVersion</key><string>__BUILD__</string>
 	<key>LSMinimumSystemVersion</key><string>13.0</string>
+	<key>CFBundleIconFile</key><string>AppIcon</string>
 	<key>LSUIElement</key><true/>
+	<key>SUFeedURL</key><string>https://github.com/favoretti/display-keeper/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key><string>hKvkZpU81lRfsYqGs/00iTPCBd6PQcYIYPAa4Z3qqTg=</string>
+	<key>SUEnableAutomaticChecks</key><true/>
 	<key>NSHighResolutionCapable</key><true/>
 	<key>NSHumanReadableCopyright</key><string>MIT License</string>
 </dict>
