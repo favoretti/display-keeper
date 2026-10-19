@@ -1,6 +1,7 @@
 import AppKit
 import CoreGraphics
 import Foundation
+import os
 
 public enum RestoreOutcome: Equatable, Sendable {
     case alreadyCorrect
@@ -18,7 +19,12 @@ public final class Keeper {
     public var isPaused = false
     public var restoresWindows = true
     public var onRestore: ((RestoreOutcome) -> Void)?
-    public var log: (String) -> Void = { print("\(Date()) \($0)") }
+    /// Unified log, so a menu-bar launch leaves a trace: `log show --predicate 'subsystem == "io.github.favoretti.DisplayKeeper"'`.
+    public var log: (String) -> Void = { message in
+        Keeper.logger.notice("\(message, privacy: .public)")
+        if isatty(STDOUT_FILENO) != 0 { print("\(Date()) \(message)") }
+    }
+    static let logger = Logger(subsystem: "io.github.favoretti.DisplayKeeper", category: "restore")
 
     /// Wake fires a burst of callbacks while monitors come up; act once it has been quiet.
     public var settleDelay: TimeInterval = 4
@@ -41,18 +47,25 @@ public final class Keeper {
         observers.append(DistributedNotificationCenter.default().addObserver(
             forName: Notification.Name("com.apple.screenIsUnlocked"), object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.schedule(after: self?.unlockDelay ?? 1) }
+            MainActor.assumeIsolated {
+                self?.log("unlock")
+                self?.schedule(after: self?.unlockDelay ?? 1)
+            }
         })
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.schedule(after: self?.settleDelay ?? 4) }
+            MainActor.assumeIsolated {
+                self?.log("wake")
+                self?.schedule(after: self?.settleDelay ?? 4)
+            }
         })
         schedule(after: settleDelay)
     }
 
     fileprivate func displaysChanged() {
         guard Date() >= ignoreUntil else { return }
+        log("display change; checking in \(settleDelay)s")
         schedule(after: settleDelay)
     }
 
@@ -68,10 +81,7 @@ public final class Keeper {
     @discardableResult
     public func restore(force: Bool = false) -> RestoreOutcome {
         let outcome = computeAndApply(force: force)
-        switch outcome {
-        case .alreadyCorrect, .noProfile, .paused: break
-        default: log(String(describing: outcome))
-        }
+        log("check: \(outcome)")
         switch outcome {
         case .restored, .windowsRestored, .failed: lastOutcome = (outcome, Date())
         default: break
