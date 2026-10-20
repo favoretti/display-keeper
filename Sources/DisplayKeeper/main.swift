@@ -147,6 +147,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         do {
             let p = try layouts.saveCurrent()
             lastOutcome = "Saved \(p.placements.count) displays, \(p.windows.count) windows"
+            if settings.restoresWindows && !settings.isTrusted {
+                alert("Windows were not saved", "DisplayKeeper needs Accessibility access to read window positions. Grant it in System Settings → Privacy & Security → Accessibility, then save again.")
+            }
         } catch { alert("Could not save layout", error) }
     }
 

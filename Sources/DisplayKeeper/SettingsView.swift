@@ -144,7 +144,10 @@ struct LayoutsSettingsView: View {
                 Button("Delete…") { confirmingDelete = selectedItem }
                     .disabled(selectedItem == nil)
             }
-            if !settings.restoresWindows {
+            if settings.restoresWindows && !settings.isTrusted {
+                Text("Accessibility access is not granted, so saving stores monitor positions only.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            } else if !settings.restoresWindows {
                 Text("Restore Windows is off, so saving stores monitor positions only.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
