@@ -38,8 +38,10 @@ sign $app
 (cd dist && ditto -c -k --keepParent DisplayKeeper.app DisplayKeeper-$version.zip)
 
 if [[ -n ${NOTARY_PROFILE:-} ]]; then
+  notary_keychain=()
+  [[ -n ${NOTARY_KEYCHAIN:-} ]] && notary_keychain=(--keychain $NOTARY_KEYCHAIN)
   xcrun notarytool submit dist/DisplayKeeper-$version.zip --keychain-profile $NOTARY_PROFILE \
-    ${NOTARY_KEYCHAIN:+--keychain $NOTARY_KEYCHAIN} --wait
+    $notary_keychain --wait
   xcrun stapler staple $app
   rm dist/DisplayKeeper-$version.zip
   (cd dist && ditto -c -k --keepParent DisplayKeeper.app DisplayKeeper-$version.zip)
