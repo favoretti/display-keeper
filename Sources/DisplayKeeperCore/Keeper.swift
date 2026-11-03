@@ -69,18 +69,18 @@ public final class Keeper {
         schedule(after: settleDelay)
     }
 
-    public func schedule(after delay: TimeInterval) {
+    public func schedule(after delay: TimeInterval, force: Bool = false) {
         pending?.cancel()
         let work = DispatchWorkItem { [weak self] in
-            MainActor.assumeIsolated { _ = self?.restore() }
+            MainActor.assumeIsolated { _ = self?.restore(force: force) }
         }
         pending = work
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
     @discardableResult
-    public func restore(force: Bool = false) -> RestoreOutcome {
-        let outcome = computeAndApply(force: force)
+    public func restore(force: Bool = false, windowsOnly: Bool = false) -> RestoreOutcome {
+        let outcome = computeAndApply(force: force, windowsOnly: windowsOnly)
         log("check: \(outcome)")
         switch outcome {
         case .restored, .windowsRestored, .failed: lastOutcome = (outcome, Date())
@@ -90,27 +90,27 @@ public final class Keeper {
         return outcome
     }
 
-    private func computeAndApply(force: Bool) -> RestoreOutcome {
+    private func computeAndApply(force: Bool, windowsOnly: Bool) -> RestoreOutcome {
         if isPaused && !force { return .paused }
         let online = SystemDisplays.online()
         guard let profile = store.profile(for: online.map(\.placement.key)) else { return .noProfile }
-        let diff = profile.differences(from: online.map(\.placement)) ?? []
-        var displaysMoved = 0
+        let diff = windowsOnly ? [] : profile.differences(from: online.map(\.placement)) ?? []
         if !diff.isEmpty {
             do {
                 ignoreUntil = Date().addingTimeInterval(2)
                 try Arranger.apply(profile, to: online)
-                displaysMoved = diff.count
             } catch {
                 return .failed(String(describing: error))
             }
+            // Windows wait for the next pass: macOS keeps relocating them for a while after the
+            // displays move, and would undo a move made now.
+            if restoresWindows { schedule(after: settleDelay, force: force) }
+            return .restored(count: diff.count)
         }
         // Windows are checked on every pass: macOS can shuffle them even when the displays came back right.
-        let windowsMoved = restoresWindows && !profile.windows.isEmpty
-            ? SystemWindows.restore(profile.windows, displays: SystemDisplays.online().map(\.placement)) : 0
-        if displaysMoved > 0 { return .restored(count: displaysMoved) }
-        if windowsMoved > 0 { return .windowsRestored(count: windowsMoved) }
-        return .alreadyCorrect
+        let windowsMoved = (restoresWindows || windowsOnly) && !profile.windows.isEmpty
+            ? SystemWindows.restore(profile.windows, displays: online.map(\.placement)) : 0
+        return windowsMoved > 0 ? .windowsRestored(count: windowsMoved) : .alreadyCorrect
     }
 
     /// Save the current arrangement as the layout to keep for this set of monitors.

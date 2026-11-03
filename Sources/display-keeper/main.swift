@@ -44,7 +44,10 @@ func run() {
         case .noProfile: fail("no saved layout for this set of monitors; arrange them and run: display-keeper save")
         case .failed(let why): fail(why)
         case .alreadyCorrect: print("already correct")
-        case .restored(let n): print("restored \(n) display(s)")
+        case .restored(let n):
+            print("restored \(n) display(s)")
+            Thread.sleep(forTimeInterval: keeper.settleDelay)
+            if case .windowsRestored(let w) = keeper.restore(force: true, windowsOnly: true) { print("moved \(w) window(s)") }
         case .windowsRestored(let n): print("moved \(n) window(s)")
         case .paused: break
         }

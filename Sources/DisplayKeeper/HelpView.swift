@@ -157,10 +157,11 @@ struct HelpSection: Identifiable {
                 "After you unlock the Mac (1 second by default).",
                 "When Display Keeper starts.",
                 "Whenever you choose **Restore Saved Layout** from the menu, even while automatic restore is paused.",
+                "Whenever you choose **Restore Windows Now** from the menu. This moves windows only and leaves the monitors as they are.",
             ]),
             .paragraph("Each time, Display Keeper compares the current position and resolution of every monitor with the saved layout. If anything differs it rearranges all of them in one step; if they already match it leaves the displays alone. If a saved resolution is no longer offered, it uses the same resolution at the closest refresh rate."),
             .heading("How windows are matched"),
-            .paragraph("When Restore Windows is on, windows are checked on every pass, because macOS can move them even when the displays came back in the right order. Each saved window is matched to an open one in this order:"),
+            .paragraph("When Restore Windows is on, windows are checked on every pass, because macOS can move them even when the displays came back in the right order. When the monitors had to be rearranged, windows are moved on a second pass once the delay has passed again, because macOS keeps moving windows for a while after the monitors change. Each saved window is matched to an open one in this order:"),
             .steps([
                 "**The same window**, if its app has kept running since you saved.",
                 "**The same app and window title.**",

@@ -73,6 +73,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let restore = item("Restore Saved Layout", #selector(restore), "r")
         restore.isEnabled = profile != nil
         menu.addItem(restore)
+        let restoreWindows = item("Restore Windows Now", #selector(restoreWindowsNow))
+        restoreWindows.isEnabled = profile?.windows.isEmpty == false && settings.isTrusted
+        menu.addItem(restoreWindows)
         if profile != nil { menu.addItem(item("Forget Layout for These Displays", #selector(forget))) }
         menu.addItem(.separator())
 
@@ -155,6 +158,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc func restore() {
         if case .failed(let why) = keeper.restore(force: true) { alert("Could not restore layout", why) }
+    }
+
+    @objc func restoreWindowsNow() {
+        keeper.restore(force: true, windowsOnly: true)
     }
 
     @objc func forget() {
