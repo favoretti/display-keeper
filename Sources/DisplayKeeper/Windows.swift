@@ -36,12 +36,12 @@ final class WindowPresenter: NSObject, NSWindowDelegate {
 /// Toolbar-style preferences window: one tab per pane, SF Symbol icons, resizes to each pane.
 @MainActor
 final class SettingsWindowController {
-    enum Tab: String, CaseIterable { case general, layouts, updates }
+    enum Tab: String, CaseIterable { case general, layouts, brightness, updates }
 
     private let tabs: NSTabViewController
     let presenter: WindowPresenter
 
-    init(settings: AppSettings, layouts: LayoutsModel, updater: UpdaterModel) {
+    init(settings: AppSettings, layouts: LayoutsModel, brightness: BrightnessController, updater: UpdaterModel) {
         let tabs = NSTabViewController()
         tabs.tabStyle = .toolbar
         tabs.canPropagateSelectedChildViewControllerTitle = false
@@ -57,6 +57,7 @@ final class SettingsWindowController {
         }
         add(.general, "General", "gearshape", GeneralSettingsView(settings: settings))
         add(.layouts, "Layouts", "rectangle.3.group", LayoutsSettingsView(layouts: layouts, settings: settings))
+        add(.brightness, "Brightness", "sun.max", BrightnessSettingsView(brightness: brightness))
         add(.updates, "Updates", "arrow.triangle.2.circlepath", UpdatesSettingsView(updater: updater))
 
         let window = NSWindow(contentViewController: tabs)

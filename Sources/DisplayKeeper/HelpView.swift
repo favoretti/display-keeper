@@ -169,6 +169,16 @@ struct HelpSection: Identifiable {
             ]),
             .paragraph("Each open window is used at most once. Windows that match nothing are left alone. A matched window is moved back to the monitor it was on and given its saved size and position on that monitor; windows that are already within a few points of their spot are not touched."),
         ]),
+        HelpSection(id: "brightness", title: "Brightness", symbol: "sun.max", blocks: [
+            .paragraph("The menu has a brightness slider under each display. Display Keeper picks the method per display, and **Settings → Brightness** shows which one each display uses:"),
+            .bullets([
+                "**macOS**: the built-in screen and Apple displays, the same way Control Center does it.",
+                "**DDC**: external monitors on Apple silicon, by sending the monitor the brightness command over the cable. Turn on DDC/CI in the monitor's own menu if it doesn't respond.",
+                "**Software dimming**: monitors without DDC are dimmed by darkening the picture. With **Combine hardware and software dimming**, DDC monitors also dim in software once their hardware brightness is at zero, on the lower half of the slider.",
+            ]),
+            .paragraph("With **Sync brightness changes from built-in and Apple displays** on, any change to the built-in screen (the light sensor, brightness keys, Control Center) is copied to the other displays, and they are brought to its level at launch and after wake."),
+            .paragraph("Brightness is saved per monitor, using the same identity as layouts. If a display ends up black, hold **Shift** while Display Keeper starts: saved brightness is reset and nothing is read or set. Quitting Display Keeper removes software dimming."),
+        ]),
         HelpSection(id: "limits", title: "What Is Not Restored", symbol: "eye.slash", blocks: [
             .bullets([
                 "**Minimised windows** are skipped, both when saving and when restoring.",

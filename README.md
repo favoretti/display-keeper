@@ -67,6 +67,15 @@ The menu also has **Restore Saved Layout**, **Forget Layout for These Displays**
 **Pause Automatic Restore**. **Settings…** has the restore delays, your saved layouts (with the windows
 saved in each) and update preferences; **Help** explains all of this in the app.
 
+### Brightness
+
+The menu also has a brightness slider per display: the built-in screen and Apple displays through
+DisplayServices (as Control Center does), other monitors over DDC/CI on Apple silicon, and gamma dimming
+for monitors without DDC. **Settings → Brightness** has smooth transitions, combined hardware + software
+dimming for extra range below the monitor's minimum, syncing external monitors to the built-in screen
+(light sensor, brightness keys, Control Center), and what to do at startup or wake. Hold Shift at launch for
+safe mode (saved brightness reset, nothing read or written).
+
 ## Command line
 
 The app bundle contains a CLI at `DisplayKeeper.app/Contents/Resources/display-keeper`:
@@ -92,6 +101,9 @@ Profiles live in `~/Library/Application Support/DisplayKeeper/profiles.json`, sh
   the Mac App Store. If Apple removes the function, it falls back to the numeric serial and then the port.
 - Tested on Apple silicon. On Intel Macs the IOKit layout differs; the per-unit serial lookup may fall
   back to the port.
+- Brightness uses private APIs too: `IOAVService` for DDC and DisplayServices for Apple displays. DDC
+  is Apple silicon only; on Intel external monitors get software dimming. Software dimming writes gamma
+  tables, so it fights with other apps that do (f.lux).
 - Mirroring and rotation are not managed; mirrored displays are left as they are.
 - Builds you make yourself are ad-hoc signed, so macOS may ask for Accessibility access again after each
   rebuild. Signed releases keep the permission across updates.

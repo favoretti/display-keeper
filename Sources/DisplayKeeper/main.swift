@@ -6,11 +6,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     let keeper = Keeper()
     lazy var settings = AppSettings(keeper: keeper)
     lazy var layouts = LayoutsModel(keeper: keeper)
+    let brightness = BrightnessController()
     let updater = UpdaterModel()
     var statusItem: NSStatusItem!
     var lastOutcome = "Watching"
 
-    private lazy var settingsWindow = SettingsWindowController(settings: settings, layouts: layouts, updater: updater)
+    private lazy var settingsWindow = SettingsWindowController(settings: settings, layouts: layouts, brightness: brightness, updater: updater)
     private lazy var aboutWindow = WindowPresenter(title: "About Display Keeper", autosaveName: "AboutWindow", content: AboutView())
     private lazy var helpWindow = WindowPresenter(title: "Display Keeper Help", autosaveName: "HelpWindow", resizable: true, content: HelpView())
 
@@ -25,13 +26,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         _ = settings
         keeper.onRestore = { [weak self] outcome in self?.record(outcome) }
         keeper.start()
+        brightness.start()
         LaunchOptions.show.forEach(show)
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        brightness.stop()
     }
 
     func show(_ screen: LaunchOptions.Screen) {
         switch screen {
         case .settings: settingsWindow.show(.general)
         case .layouts: settingsWindow.show(.layouts)
+        case .brightness: settingsWindow.show(.brightness)
         case .updates: settingsWindow.show(.updates)
         case .about: aboutWindow.show()
         case .help: helpWindow.show()
@@ -65,6 +72,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         for d in online {
             menu.addItem(disabled("\(d.placement.name) — \(d.placement.mode.description)"))
+            if let b = brightness.display(d.id) {
+                let slider = NSMenuItem()
+                slider.view = BrightnessSliderView(display: b, controller: brightness)
+                menu.addItem(slider)
+            }
         }
         menu.addItem(.separator())
 
@@ -195,9 +207,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 }
 
 /// Hidden launch arguments for development and screenshots:
-/// `--show settings|layouts|updates|about|help` (repeatable) and `--appearance light|dark`.
+/// `--show settings|layouts|brightness|updates|about|help` (repeatable) and `--appearance light|dark`.
 enum LaunchOptions {
-    enum Screen: String { case settings, layouts, updates, about, help }
+    enum Screen: String { case settings, layouts, brightness, updates, about, help }
 
     static var show: [Screen] { values(for: "--show").compactMap(Screen.init(rawValue:)) }
 
